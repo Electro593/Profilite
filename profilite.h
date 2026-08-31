@@ -8,10 +8,6 @@
  * \date August 31, 2026
  */
 
-#define _PROFILITE_STRINGIFY_(...) #__VA_ARGS__
-#define _PROFILITE_STRINGIFY(...) _PROFILITE_STRINGIFY_(__VA_ARGS__)
-#define _PROFILITE_CHECK_EMPTY(Value) ((0 - Value - 1) == 1 && (Value - 0) != -2)
-
 /**
  * \defgroup configuration Configuration Macros
  *
@@ -42,7 +38,7 @@
  */
 #ifndef PROFILITE
 #define PROFILITE 0
-#elif _PROFILITE_CHECK_EMPTY(PROFILITE)
+#elif (0 - PROFILITE - 1) == 1 && (PROFILITE - 0) != -2 /* Check empty */
 #undef PROFILITE
 #define PROFILITE 1
 #endif
@@ -68,7 +64,7 @@
  */
 #ifndef PROFILITE_AUTO_REPORT
 #define PROFILITE_AUTO_REPORT 0
-#elif _PROFILITE_CHECK_EMPTY(PROFILITE_AUTO_REPORT)
+#elif (0 - PROFILITE_AUTO_REPORT - 1) == 1 && (PROFILITE_AUTO_REPORT - 0) != -2 /* Check empty */
 #undef PROFILITE_AUTO_REPORT
 #define PROFILITE_AUTO_REPORT 1
 #endif
@@ -87,7 +83,7 @@
  */
 #ifndef PROFILITE_HEADER
 #define PROFILITE_HEADER 1
-#elif _PROFILITE_CHECK_EMPTY(PROFILITE_HEADER)
+#elif (0 - PROFILITE_HEADER - 1) == 1 && (PROFILITE_HEADER - 0) != -2 /* Check empty */
 #undef PROFILITE_HEADER
 #define PROFILITE_HEADER 1
 #endif
@@ -105,7 +101,7 @@
  */
 #ifndef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 0
-#elif _PROFILITE_CHECK_EMPTY(PROFILITE_IMPLEMENTATION)
+#elif (0 - PROFILITE_IMPLEMENTATION - 1) == 1 && (PROFILITE_IMPLEMENTATION - 0) != -2 /* Check empty */
 #undef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 1
 #endif
@@ -120,38 +116,8 @@
 #define PROFILITE_HEADER 0
 #endif
 
-struct profiler_profile
-{
-    const char *FileName;
-    const char *FunctionName;
-    const int Line;
-    const int Id;
-
-    const char *Name;
-    unsigned long long DataSize;
-
-    unsigned long long Elapsed;
-    unsigned long long RootElapsed;
-    unsigned long long HitCount;
-};
-
-struct profiler_scope
-{
-    struct profiler_profile *Profile;
-    struct profiler_profile *Parent;
-    unsigned long long Start;
-    unsigned long long PrevElapsed;
-};
-
-struct profiler
-{
-    int Initialized;
-    unsigned long long Start;
-    struct profiler_profile *Profiles;
-};
-
 /**
- * \defgroup toolchain_polyfills Toolchain Polyfill Macros
+ * \defgroup compiler_polyfills Compiler Polyfill Macros
  *
  * \brief Macros for compiler-specific operations.
  *
@@ -177,7 +143,28 @@ struct profiler
 #elif defined(__GNUC__) || defined(__clang__)
 #define PROFILITE_CLEANUP(Function) __attribute__((cleanup(Function)))
 #else
-#warning Your toolchain is unable to support Profile_*() helpers. Define PROFILITE_CLEANUP prior to inclusion to remove this message and enable them, or use Profilite_WrapScope() instead
+#warning PROFILITE_CLEANUP: Your compiler is unable to support Profile_*() helpers. Define PROFILITE_CLEANUP prior to inclusion to remove this message and enable them, or use Profilite_WrapScope() instead
+#endif
+#endif
+
+/**
+ * \def PROFILITE_STORAGE
+ *
+ * \brief Alias for `static inline`.
+ *
+ * \details May be redefined to configure function storage classes. Polyfilled on
+ * unsupported compilers as `static inline`, which is not ANSI-compliant.
+ */
+#ifndef PROFILITE_STORAGE
+#if defined(_PROFILITE_TOOLING)
+#define PROFILITE_STORAGE
+#elif defined(_MSC_VER)
+#define PROFILITE_STORAGE static __inline
+#elif defined(__GNUC__) || defined(__clang__)
+#define PROFILITE_STORAGE static __inline__
+#else
+#warning PROFILITE_STORAGE: Your compiler is unsupported; defaulting to `static inline`. Define PROFILITE_STORAGE prior to inclusion to remove this warning
+#define PROFILITE_STORAGE static inline
 #endif
 #endif
 
@@ -192,23 +179,78 @@ struct profiler
  *
  * \param[in] Name The name of the section to insert into.
  *
- * \param[in] ... MSVC-only: The attributes to apply to the created section.
- * Must include `read`, optionally `write`.
+ * \param[in] Attributes MSVC-only: The attributes to apply to the created section.
+ * Must include `read`, optionally `write`, as a comma-delimited string.
  */
 #ifndef PROFILITE_SECTION
 #if defined(_PROFILITE_TOOLING)
-#define PROFILITE_SECTION(Name, ...)
+#define PROFILITE_SECTION(Name, Attributes)
 #elif defined(__GNUC__) || defined(__clang__)
-#define PROFILITE_SECTION(Name, ...) __attribute__((section(Name)))
+#define PROFILITE_SECTION(Name, Attributes) __attribute__((section(Name)))
 #elif defined(_MSC_VER)
-#define _PROFILITE_SECTION(Name, ...)                                                                                  \
-    _Pragma("section(" Name ", " _PROFILITE_STRINGIFY(__VA_ARGS__) ")") __declspec(allocate(Name))
+#define _PROFILITE_SECTION(Name, Attributes) _Pragma("section(" Name ", " Attributes ")") __declspec(allocate(Name))
 #else
-#error Your toolchain is unsupported. Define PROFILITE_SECTION prior to inclusion to remove this error
+#error PROFILITE_SECTION: Your compiler is unsupported. Define PROFILITE_SECTION prior to inclusion to remove this error
+#endif
+#endif
+
+/**
+ * \def PROFILITE_UINT64
+ *
+ * \brief Alias for an unsigned 64-bit word.
+ *
+ * \details May be redefined to specify a different base type. Polyfilled on
+ * unsupported compilers as `uint64_t` via `stdint.h`.
+ */
+#ifndef PROFILITE_UINT64
+#if defined(_PROFILITE_TOOLING)
+#define PROFILITE_UINT64
+#elif defined(_MSC_VER)
+#define PROFILITE_UINT64 unsigned __int64
+#elif defined(__GNUC__) || defined(__clang__)
+#ifdef __LP64__
+#define PROFILITE_UINT64 unsigned long int
+#else
+#define PROFILITE_UINT64 __extension__ unsigned long long int
+#endif
+#else
+#warning PROFILITE_UINT64: Your compiler is unsupported; defaulting to uint64_t. Define PROFILITE_UINT64 prior to inclusion to remove this warning
+#include <stdint.h>
+#define PROFILITE_UINT64 uint64_t
 #endif
 #endif
 
 /** \} */
+
+struct profilite_profile
+{
+    const char *FileName;
+    const char *FunctionName;
+    const unsigned int Line;
+    const unsigned int Id;
+
+    const char *Name;
+    PROFILITE_UINT64 DataSize;
+
+    PROFILITE_UINT64 Elapsed;
+    PROFILITE_UINT64 RootElapsed;
+    PROFILITE_UINT64 HitCount;
+};
+
+struct profilite_scope
+{
+    struct profilite_profile *Profile;
+    struct profilite_profile *Parent;
+    PROFILITE_UINT64 Start;
+    PROFILITE_UINT64 PrevElapsed;
+};
+
+struct profilite
+{
+    int Initialized;
+    PROFILITE_UINT64 Start;
+    struct profilite_profile *Profiles;
+};
 
 /**
  * \defgroup lifecycle_functions Lifecycle Functions
@@ -230,7 +272,7 @@ struct profiler
  * If called again, all previous profile data will be discarded and collection
  * will be restarted from that point onward.
  */
-static inline void Profilite_Init(void);
+PROFILITE_STORAGE void Profilite_Init(void);
 
 /**
  * \def Profilite_DeclareProfile(Id, Name, DataSize)
@@ -251,11 +293,15 @@ static inline void Profilite_Init(void);
  */
 #ifdef PROFILITE_SECTION
 #define Profilite_DeclareProfile(Id, Name, DataSize)                                                                   \
-    PROFILITE_SECTION(".profiler", read, write)                                                                        \
+    PROFILITE_SECTION(".profiler", "read, write")                                                                      \
     static struct profiler_profile ProfiliteProfile##Id = {                                                            \
         __FILE__, __FUNCTION__, __LINE__, Id, Name, DataSize, 0, 0, 0,                                                 \
     };
 #endif
+
+PROFILITE_STORAGE struct profilite_scope Profilite_BeginScope(struct profilite_profile *Profile);
+
+PROFILITE_STORAGE void Profilite_EndScope(struct profilite_scope *Scope);
 
 /**
  * \brief Print a report of the profiled scopes to stdout.
@@ -269,11 +315,9 @@ static inline void Profilite_Init(void);
  *
  * \bug The report's runtime is currently not excluded from subsequent reports.
  */
-static inline void Profilite_Report(void);
+PROFILITE_STORAGE void Profilite_Report(void);
 
 /** \} */
-
-void Profile_Begin();
 
 /**
  * \defgroup scope_helpers Profile Scope Helpers
@@ -345,9 +389,9 @@ void Profile_Begin();
  *
  * \param DataSize The data size to amend the scope to, in bytes.
  */
-void Profile_AmendDataSize(unsigned long long DataSize);
+void Profile_AmendDataSize(PROFILITE_UINT64 DataSize);
 
-#endif // PROFILITE_HEADER
+#endif /** PROFILITE_HEADER */
 
 #if PROFILITE_IMPLEMENTATION || defined(_PROFILITE_TOOLING)
 #ifndef _PROFILITE_TOOLING
@@ -357,25 +401,35 @@ void Profile_AmendDataSize(unsigned long long DataSize);
 
 #if (PROFILITE_AUTO_REPORT || defined(_PROFILITE_TOOLING)) && defined(PROFILITE_SECTION)
 #ifdef _WIN32
-PROFILITE_SECTION(".CRT$XCU", read) void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".CRT$XPU", read) void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
-#else
-PROFILITE_SECTION(".init_array", read) void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".fini_array", read) void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
+PROFILITE_SECTION(".CRT$XCU", "read") void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".CRT$XPU", "read") void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
+#else /* TODO: __ELF__ */
+PROFILITE_SECTION(".init_array", "read") void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".fini_array", "read") void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
 #endif
 #endif
 
-static inline void Profilite_Init(void)
+PROFILITE_STORAGE void Profilite_Init(void)
 {
 }
 
-static inline void Profilite_Report(void)
+PROFILITE_STORAGE struct profilite_scope Profilite_BeginScope(struct profilite_profile *Profile)
+{
+    struct profilite_scope Scope;
+    return Scope;
+}
+
+PROFILITE_STORAGE void Profilite_EndScope(struct profilite_scope *Scope)
 {
 }
 
-#endif // PROFILITE_IMPLEMENTATION
+PROFILITE_STORAGE void Profilite_Report(void)
+{
+}
 
-#else // !PROFILITE
+#endif /** PROFILITE_IMPLEMENTATION */
+
+#else /** !PROFILITE */
 
 #define Profile_Bandwidth()
 #define Profile_Scope()
@@ -385,4 +439,6 @@ static inline void Profilite_Report(void)
 #define Profilite_Init()
 #define Profilite_Report()
 
-#endif // PROFILITE
+#endif /** PROFILITE */
+
+#undef PROFILITE_CHECK_EMPTY

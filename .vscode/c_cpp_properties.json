@@ -5,9 +5,10 @@
             "includePath": [
                 "${workspaceFolder}/**"
             ],
+            "compilerArgs": ["-pedantic"],
             "defines": [
             ],
-            "cStandard": "c23",
+            "cStandard": "c89",
             "intelliSenseMode": "linux-gcc-x64"
         }
     ],

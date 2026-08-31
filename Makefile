@@ -1,17 +1,17 @@
 DOC_INDEX = docs/html/index.html
 
-CFLAGS += -std=c23 -O3
+CFLAGS += -std=c89 -O3 -Wall -Werror -pedantic
 
 .PHONY: all
 all: test docs
 
-test: test.c profilite.h
-	$(CC) $(CFLAGS) $^ -o $@
+test: Makefile test.c profilite.h
+	$(CC) $(CFLAGS) test.c -o $@
 
 .PHONY: docs
 docs: $(DOC_INDEX)
 
-$(DOC_INDEX): Doxyfile profilite.h
+$(DOC_INDEX): Makefile Doxyfile profilite.h
 	doxygen Doxyfile
 
 .PHONY: clean
