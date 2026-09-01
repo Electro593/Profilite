@@ -137,7 +137,7 @@
  * Defaults to 0 if __STDC__ or __STDC_VERSION__ are defined, 1 otherwise.
  */
 #ifndef PROFILITE_TRADITIONAL
-#if defined(__STDC__) || defined(__STDC_VERSION__) || defined(_PROFILITE_DOXYGEN)
+#if defined(__STDC__) || defined(__STDC_VERSION__) || defined(PROFILITE_DOXYGEN)
 #define PROFILITE_TRADITIONAL 0
 #else
 #define PROFILITE_TRADITIONAL 1
@@ -151,10 +151,10 @@
 
 /** \} */
 
-#if PROFILITE || defined(_PROFILITE_DOXYGEN)
+#if PROFILITE || defined(PROFILITE_DOXYGEN)
 
-#if PROFILITE_HEADER || defined(_PROFILITE_DOXYGEN)
-#ifndef _PROFILITE_DOXYGEN
+#if PROFILITE_HEADER || defined(PROFILITE_DOXYGEN)
+#ifndef PROFILITE_DOXYGEN
 #undef PROFILITE_HEADER
 #define PROFILITE_HEADER 0
 #endif
@@ -445,13 +445,13 @@ void Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
 
 #endif /** PROFILITE_HEADER */
 
-#if PROFILITE_IMPLEMENTATION || defined(_PROFILITE_DOXYGEN)
-#ifndef _PROFILITE_DOXYGEN
+#if PROFILITE_IMPLEMENTATION || defined(PROFILITE_DOXYGEN)
+#ifndef PROFILITE_DOXYGEN
 #undef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 0
 #endif
 
-#if (PROFILITE_AUTO_REPORT || defined(_PROFILITE_DOXYGEN)) && defined(PROFILITE_SECTION)
+#if (PROFILITE_AUTO_REPORT || defined(PROFILITE_DOXYGEN)) && defined(PROFILITE_SECTION)
 #ifdef _WIN32
 PROFILITE_SECTION(".CRT$XCU", "read") static void (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
 PROFILITE_SECTION(".CRT$XPU", "read") static void (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
