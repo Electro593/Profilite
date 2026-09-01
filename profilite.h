@@ -30,9 +30,8 @@
  * \details Overrides \ref PROFILITE_HEADER and \ref PROFILITE_IMPLEMENTATION.
  * If unset, all profiler macros and functions will be compiled out.
  *
- * This is a **header** configuration and must be specified any time
- * profilite.h is included. It is recommended to define this in your build
- * system so that it can be enabled/disabled in only one location.
+ * This is a **header** configuration. It is recommended to define this in your
+ * build system so that it can be enabled or disabled in only one location.
  *
  * Defaults to 0.
  */
@@ -56,8 +55,7 @@
  * Profilite_Report() will be inserted into `.fini_array`/`.CRT$XPU` to execute
  * on process termination.
  *
- * This is an **implementation** configuration and should be set in the same
- * file as \ref PROFILITE_IMPLEMENTATION.
+ * This is an **implementation** configuration.
  *
  * Defaults to 0.
  *
@@ -81,7 +79,8 @@
  * \details If set, declarations will be included. This macro is redefined to 0
  * after inclusion to act as a header guard.
  *
- * In most cases, you will not need to set this configuration manually.
+ * This is a **header** configuration, but in most cases, you will not need to
+ * set it manually.
  *
  * Defaults to 1.
  */
@@ -100,8 +99,10 @@
  * \brief Include the profiler's definitions.
  *
  * \details If set, definitions will be included. This macro is redefined to 0
- * after inclusion to act as a header guard. You should expect to set this once
- * in your main file.
+ * after inclusion to act as a header guard.
+ *
+ * This is an **implementation** configuration and should be set once per
+ * project.
  *
  * Defaults to 0.
  */
@@ -117,9 +118,12 @@
 /**
  * \def PROFILITE_STORAGE
  *
- * \brief Configures the storage specifier on all function definitions.
+ * \brief Configures the storage specifier on function prototypes and
+ * definitions.
  *
  * \details Use this if you want to make Profilite functions static or inline.
+ *
+ * This is both a **header** and **implementation** configuration.
  *
  * Defaults to nothing.
  */
@@ -132,7 +136,11 @@
  *
  * \brief Switches definitions to use traditional K&R C syntax.
  *
- * \details Use this if you're, for some strange reason, compiling K&R C.
+ * \details Use this if you're, for some strange reason, compiling K&R C but
+ * have `__STDC__` or `__STDC_VERSION__` defined.
+ *
+ * This is both a **header** and **implementation** configuration and should be
+ * the same across all inclusions of this file.
  *
  * Defaults to 0 if __STDC__ or __STDC_VERSION__ are defined, 1 otherwise.
  */
@@ -275,33 +283,33 @@ __extension__ typedef unsigned long long int profilite_uint64;
 
 struct profilite_profile
 {
-    PROFILITE_CONST char *FileName;
-    PROFILITE_CONST char *FunctionName;
-    PROFILITE_CONST unsigned int Line;
-    PROFILITE_CONST unsigned int Id;
+    PROFILITE_CONST char *ProfiliteProfileFileName;
+    PROFILITE_CONST char *ProfiliteProfileFunctionName;
+    PROFILITE_CONST unsigned int ProfiliteProfileLine;
+    PROFILITE_CONST unsigned int ProfiliteProfileId;
 
-    PROFILITE_CONST char *Name;
-    PROFILITE_UINTMAX DataSize;
+    PROFILITE_CONST char *ProfiliteProfileName;
+    PROFILITE_UINTMAX ProfiliteProfileDataSize;
 
-    PROFILITE_UINTMAX Elapsed;
-    PROFILITE_UINTMAX RootElapsed;
-    PROFILITE_UINTMAX HitCount;
+    PROFILITE_UINTMAX ProfiliteProfileElapsed;
+    PROFILITE_UINTMAX ProfiliteProfileRootElapsed;
+    PROFILITE_UINTMAX ProfiliteProfileHitCount;
 };
 
 struct profilite_scope
 {
-    struct profilite_profile *Profile;
-    struct profilite_profile *Parent;
-    PROFILITE_UINTMAX Start;
-    PROFILITE_UINTMAX PrevElapsed;
+    struct profilite_profile *ProfiliteScopeProfile;
+    struct profilite_profile *ProfiliteScopeParent;
+    PROFILITE_UINTMAX ProfiliteScopeStart;
+    PROFILITE_UINTMAX ProfiliteScopePrevElapsed;
 };
 
 struct profilite
 {
-    struct profilite_profile *Profiles;
-    PROFILITE_UINTMAX Start;
-    int Initialized;
-    int Padding0;
+    struct profilite_profile *ProfiliteProfiles;
+    PROFILITE_UINTMAX ProfiliteStart;
+    int ProfiliteInitialized;
+    int ProfilitePadding0;
 };
 
 /**
@@ -324,7 +332,12 @@ struct profilite
  * If called again, all previous profile data will be discarded and collection
  * will be restarted from that point onward.
  */
-PROFILITE_STORAGE void Profilite_Init(void);
+PROFILITE_STORAGE int
+#if PROFILITE_TRADITIONAL
+Profilite_Init();
+#else
+Profilite_Init(void);
+#endif
 
 /**
  * \def Profilite_DeclareProfile(Id, Name, DataSize)
@@ -353,7 +366,7 @@ PROFILITE_STORAGE void Profilite_Init(void);
 
 PROFILITE_STORAGE struct profilite_scope Profilite_BeginScope(struct profilite_profile *Profile);
 
-PROFILITE_STORAGE void Profilite_EndScope(struct profilite_scope *Scope);
+PROFILITE_STORAGE int Profilite_EndScope(struct profilite_scope *Scope);
 
 /**
  * \brief Print a report of the profiled scopes to stdout.
@@ -367,7 +380,12 @@ PROFILITE_STORAGE void Profilite_EndScope(struct profilite_scope *Scope);
  *
  * \bug The report's runtime is currently not excluded from subsequent reports.
  */
-PROFILITE_STORAGE void Profilite_Report(void);
+PROFILITE_STORAGE int
+#if PROFILITE_TRADITIONAL
+Profilite_Report();
+#else
+Profilite_Report(void);
+#endif
 
 /** \} */
 
@@ -441,7 +459,7 @@ PROFILITE_STORAGE void Profilite_Report(void);
  *
  * \param DataSize The data size to amend the scope to, in bytes.
  */
-void Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
+int Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
 
 #endif /** PROFILITE_HEADER */
 
@@ -453,21 +471,22 @@ void Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
 
 #if (PROFILITE_AUTO_REPORT || defined(PROFILITE_DOXYGEN)) && defined(PROFILITE_SECTION)
 #ifdef _WIN32
-PROFILITE_SECTION(".CRT$XCU", "read") static void (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".CRT$XPU", "read") static void (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
+PROFILITE_SECTION(".CRT$XCU", "read") static int (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".CRT$XPU", "read") static int (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
 #else /* TODO: __ELF__ */
-PROFILITE_SECTION(".init_array", "read") static void (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".fini_array", "read") static void (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
+PROFILITE_SECTION(".init_array", "read") static int (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".fini_array", "read") static int (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
 #endif
 #endif
 
-PROFILITE_STORAGE void
+PROFILITE_STORAGE int
 #if PROFILITE_TRADITIONAL
 Profilite_Init()
 #else
 Profilite_Init(void)
 #endif
 {
+    return 0;
 }
 
 PROFILITE_STORAGE struct profilite_scope
@@ -479,27 +498,30 @@ Profilite_BeginScope(struct profilite_profile *Profile)
 #endif
 {
     struct profilite_scope Scope;
-    Scope.Parent = Profile;
+    Scope.ProfiliteScopeParent = Profile;
     return Scope;
 }
 
-PROFILITE_STORAGE void
+PROFILITE_STORAGE int
 #if PROFILITE_TRADITIONAL
-    Profilite_EndScope(Scope) struct profilite_scope *Scope;
+Profilite_EndScope(Scope)
+struct profilite_scope *Scope;
 #else
 Profilite_EndScope(struct profilite_scope *Scope)
 #endif
 {
-    (void)Scope;
+    Scope = Scope;
+    return 0;
 }
 
-PROFILITE_STORAGE void
+PROFILITE_STORAGE int
 #if PROFILITE_TRADITIONAL
 Profilite_Report()
 #else
 Profilite_Report(void)
 #endif
 {
+    return 0;
 }
 
 #endif /** PROFILITE_IMPLEMENTATION */
