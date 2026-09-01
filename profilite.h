@@ -38,9 +38,11 @@
  */
 #ifndef PROFILITE
 #define PROFILITE 0
-#elif (0 - PROFILITE - 1) == 1 && (PROFILITE - 0) != -2 /* Check empty */
+#else
+#if (0 - PROFILITE - 1) == 1 && (PROFILITE - 0) != -2 /* Check empty */
 #undef PROFILITE
 #define PROFILITE 1
+#endif
 #endif
 
 /**
@@ -64,9 +66,11 @@
  */
 #ifndef PROFILITE_AUTO_REPORT
 #define PROFILITE_AUTO_REPORT 0
-#elif (0 - PROFILITE_AUTO_REPORT - 1) == 1 && (PROFILITE_AUTO_REPORT - 0) != -2 /* Check empty */
+#else
+#if (0 - PROFILITE_AUTO_REPORT - 1) == 1 && (PROFILITE_AUTO_REPORT - 0) != -2 /* Check empty */
 #undef PROFILITE_AUTO_REPORT
 #define PROFILITE_AUTO_REPORT 1
+#endif
 #endif
 
 /**
@@ -83,9 +87,11 @@
  */
 #ifndef PROFILITE_HEADER
 #define PROFILITE_HEADER 1
-#elif (0 - PROFILITE_HEADER - 1) == 1 && (PROFILITE_HEADER - 0) != -2 /* Check empty */
+#else
+#if (0 - PROFILITE_HEADER - 1) == 1 && (PROFILITE_HEADER - 0) != -2 /* Check empty */
 #undef PROFILITE_HEADER
 #define PROFILITE_HEADER 1
+#endif
 #endif
 
 /**
@@ -101,17 +107,54 @@
  */
 #ifndef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 0
-#elif (0 - PROFILITE_IMPLEMENTATION - 1) == 1 && (PROFILITE_IMPLEMENTATION - 0) != -2 /* Check empty */
+#else
+#if (0 - PROFILITE_IMPLEMENTATION - 1) == 1 && (PROFILITE_IMPLEMENTATION - 0) != -2 /* Check empty */
 #undef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 1
+#endif
+#endif
+
+/**
+ * \def PROFILITE_STORAGE
+ *
+ * \brief Configures the storage specifier on all function definitions.
+ *
+ * \details Use this if you want to make Profilite functions static or inline.
+ *
+ * Defaults to nothing.
+ */
+#ifndef PROFILITE_STORAGE
+#define PROFILITE_STORAGE
+#endif
+
+/**
+ * \def PROFILITE_TRADITIONAL
+ *
+ * \brief Switches definitions to use traditional K&R C syntax.
+ *
+ * \details Use this if you're, for some strange reason, compiling K&R C.
+ *
+ * Defaults to 0 if __STDC__ or __STDC_VERSION__ are defined, 1 otherwise.
+ */
+#ifndef PROFILITE_TRADITIONAL
+#if defined(__STDC__) || defined(__STDC_VERSION__) || defined(_PROFILITE_DOXYGEN)
+#define PROFILITE_TRADITIONAL 0
+#else
+#define PROFILITE_TRADITIONAL 1
+#endif
+#else
+#if (0 - PROFILITE_TRADITIONAL - 1) == 1 && (PROFILITE_TRADITIONAL - 0) != -2 /* Check empty */
+#undef PROFILITE_TRADITIONAL
+#define PROFILITE_TRADITIONAL 1
+#endif
 #endif
 
 /** \} */
 
-#if PROFILITE || defined(_PROFILITE_TOOLING)
+#if PROFILITE || defined(_PROFILITE_DOXYGEN)
 
-#if PROFILITE_HEADER || defined(_PROFILITE_TOOLING)
-#ifndef _PROFILITE_TOOLING
+#if PROFILITE_HEADER || defined(_PROFILITE_DOXYGEN)
+#ifndef _PROFILITE_DOXYGEN
 #undef PROFILITE_HEADER
 #define PROFILITE_HEADER 0
 #endif
@@ -138,33 +181,33 @@
  * be defined in order to use \ref scope_helpers.
  */
 #ifndef PROFILITE_CLEANUP
-#if defined(_PROFILITE_TOOLING)
-#define PROFILITE_CLEANUP(Function)
-#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__) || defined(__clang__)
 #define PROFILITE_CLEANUP(Function) __attribute__((cleanup(Function)))
 #else
-#warning PROFILITE_CLEANUP: Your compiler is unable to support Profile_*() helpers. Define PROFILITE_CLEANUP prior to inclusion to remove this message and enable them, or use Profilite_WrapScope() instead
+#if defined(_MSC_VER)
+/* clang-format off */
+    #warning PROFILITE_CLEANUP: MSVC is unable to support Profile_*() helpers. Define PROFILITE_CLEANUP prior to inclusion to remove this message and enable them, or use Profilite_WrapScope() instead
+/* clang-format on */
+#else
+/* clang-format off */
+    #warning PROFILITE_CLEANUP: Your compiler is unsupported; disabling Profile_*() helpers. Define PROFILITE_CLEANUP prior to inclusion to remove this message and enable them, or use Profilite_WrapScope() instead
+/* clang-format on */
+#endif
 #endif
 #endif
 
 /**
- * \def PROFILITE_STORAGE
+ * \def PROFILITE_CONST
  *
- * \brief Alias for `static inline`.
+ * \brief Alias for `const`.
  *
- * \details May be redefined to configure function storage classes. Polyfilled on
- * unsupported compilers as `static inline`, which is not ANSI-compliant.
+ * \details May be redefined to disable const. Polyfilled on K&R C as empty.
  */
-#ifndef PROFILITE_STORAGE
-#if defined(_PROFILITE_TOOLING)
-#define PROFILITE_STORAGE
-#elif defined(_MSC_VER)
-#define PROFILITE_STORAGE static __inline
-#elif defined(__GNUC__) || defined(__clang__)
-#define PROFILITE_STORAGE static __inline__
+#ifndef PROFILITE_CONST
+#if PROFILITE_TRADITIONAL
+#define PROFILITE_CONST
 #else
-#warning PROFILITE_STORAGE: Your compiler is unsupported; defaulting to `static inline`. Define PROFILITE_STORAGE prior to inclusion to remove this warning
-#define PROFILITE_STORAGE static inline
+#define PROFILITE_CONST const
 #endif
 #endif
 
@@ -183,40 +226,48 @@
  * Must include `read`, optionally `write`, as a comma-delimited string.
  */
 #ifndef PROFILITE_SECTION
-#if defined(_PROFILITE_TOOLING)
-#define PROFILITE_SECTION(Name, Attributes)
-#elif defined(__GNUC__) || defined(__clang__)
+#if defined(__GNUC__) || defined(__clang__)
 #define PROFILITE_SECTION(Name, Attributes) __attribute__((section(Name)))
-#elif defined(_MSC_VER)
+#else
+#if defined(_MSC_VER)
 #define _PROFILITE_SECTION(Name, Attributes) _Pragma("section(" Name ", " Attributes ")") __declspec(allocate(Name))
 #else
-#error PROFILITE_SECTION: Your compiler is unsupported. Define PROFILITE_SECTION prior to inclusion to remove this error
+/* clang-format off */
+    #error PROFILITE_SECTION: Your compiler is unsupported. Define PROFILITE_SECTION prior to inclusion to remove this error
+/* clang-format on */
+#endif
 #endif
 #endif
 
 /**
- * \def PROFILITE_UINT64
+ * \def PROFILITE_UINTMAX
  *
- * \brief Alias for an unsigned 64-bit word.
+ * \brief Alias for `unsigned long long int`.
  *
  * \details May be redefined to specify a different base type. Polyfilled on
- * unsupported compilers as `uint64_t` via `stdint.h`.
+ * K&R C as `long int` and on unsupported C89 compilers as `unsigned long int`.
  */
-#ifndef PROFILITE_UINT64
-#if defined(_PROFILITE_TOOLING)
-#define PROFILITE_UINT64
-#elif defined(_MSC_VER)
-#define PROFILITE_UINT64 unsigned __int64
-#elif defined(__GNUC__) || defined(__clang__)
-#ifdef __LP64__
-#define PROFILITE_UINT64 unsigned long int
+#ifndef PROFILITE_UINTMAX
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ > 199409L
+#define PROFILITE_UINTMAX unsigned long long int
 #else
-#define PROFILITE_UINT64 __extension__ unsigned long long int
+#if defined(__GNUC__) || defined(__clang__)
+__extension__ typedef unsigned long long int profilite_uint64;
+#define PROFILITE_UINTMAX profilite_uint64
+#else
+#if defined(_MSC_VER)
+#define PROFILITE_UINTMAX unsigned __int64
+#else
+#if PROFILITE_TRADITIONAL
+#define PROFILITE_UINTMAX long int
+#else
+/* clang-format off */
+    #warning PROFILITE_UINTMAX: Your compiler is unsupported; defaulting to `unsigned long int`, which may be 32-bit. Define PROFILITE_UINTMAX prior to inclusion to remove this warning
+/* clang-format on */
+#define PROFILITE_UINTMAX unsigned long int
 #endif
-#else
-#warning PROFILITE_UINT64: Your compiler is unsupported; defaulting to uint64_t. Define PROFILITE_UINT64 prior to inclusion to remove this warning
-#include <stdint.h>
-#define PROFILITE_UINT64 uint64_t
+#endif
+#endif
 #endif
 #endif
 
@@ -224,32 +275,33 @@
 
 struct profilite_profile
 {
-    const char *FileName;
-    const char *FunctionName;
-    const unsigned int Line;
-    const unsigned int Id;
+    PROFILITE_CONST char *FileName;
+    PROFILITE_CONST char *FunctionName;
+    PROFILITE_CONST unsigned int Line;
+    PROFILITE_CONST unsigned int Id;
 
-    const char *Name;
-    PROFILITE_UINT64 DataSize;
+    PROFILITE_CONST char *Name;
+    PROFILITE_UINTMAX DataSize;
 
-    PROFILITE_UINT64 Elapsed;
-    PROFILITE_UINT64 RootElapsed;
-    PROFILITE_UINT64 HitCount;
+    PROFILITE_UINTMAX Elapsed;
+    PROFILITE_UINTMAX RootElapsed;
+    PROFILITE_UINTMAX HitCount;
 };
 
 struct profilite_scope
 {
     struct profilite_profile *Profile;
     struct profilite_profile *Parent;
-    PROFILITE_UINT64 Start;
-    PROFILITE_UINT64 PrevElapsed;
+    PROFILITE_UINTMAX Start;
+    PROFILITE_UINTMAX PrevElapsed;
 };
 
 struct profilite
 {
-    int Initialized;
-    PROFILITE_UINT64 Start;
     struct profilite_profile *Profiles;
+    PROFILITE_UINTMAX Start;
+    int Initialized;
+    int Padding0;
 };
 
 /**
@@ -352,9 +404,9 @@ PROFILITE_STORAGE void Profilite_Report(void);
  * data size and bandwidth columns will be included in the report.
  */
 #define Profilite_Scope(Name, DataSize)                                                                                \
-    __attribute__((section(".profiler.scopes"))) static struct profile_scope _ProfiliteScope##__COUNTER__ = {          \
+    __attribute__((section(".profiler.scopes"))) static struct profile_scope ProfiliteScope##__COUNTER__ = {           \
         .Parent = };                                                                                                   \
-    __attribute__((cleanup(Profile_End))) struct profile_scope _ProfileScopeRef =                                      \
+    __attribute__((cleanup(Profile_End))) struct profile_scope ProfiliteScopeRef =                                     \
         Profile_Begin(_Profilite_NextBlockIndex(), Name, DataSize)
 
 /**
@@ -389,41 +441,64 @@ PROFILITE_STORAGE void Profilite_Report(void);
  *
  * \param DataSize The data size to amend the scope to, in bytes.
  */
-void Profile_AmendDataSize(PROFILITE_UINT64 DataSize);
+void Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
 
 #endif /** PROFILITE_HEADER */
 
-#if PROFILITE_IMPLEMENTATION || defined(_PROFILITE_TOOLING)
-#ifndef _PROFILITE_TOOLING
+#if PROFILITE_IMPLEMENTATION || defined(_PROFILITE_DOXYGEN)
+#ifndef _PROFILITE_DOXYGEN
 #undef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 0
 #endif
 
-#if (PROFILITE_AUTO_REPORT || defined(_PROFILITE_TOOLING)) && defined(PROFILITE_SECTION)
+#if (PROFILITE_AUTO_REPORT || defined(_PROFILITE_DOXYGEN)) && defined(PROFILITE_SECTION)
 #ifdef _WIN32
-PROFILITE_SECTION(".CRT$XCU", "read") void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".CRT$XPU", "read") void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
+PROFILITE_SECTION(".CRT$XCU", "read") static void (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".CRT$XPU", "read") static void (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
 #else /* TODO: __ELF__ */
-PROFILITE_SECTION(".init_array", "read") void (*const _ProfiliteInitCtor)(void) = Profilite_Init;
-PROFILITE_SECTION(".fini_array", "read") void (*const _ProfiliteInitDstor)(void) = Profilite_Report;
+PROFILITE_SECTION(".init_array", "read") static void (*PROFILITE_CONST ProfiliteInitCtor)(void) = Profilite_Init;
+PROFILITE_SECTION(".fini_array", "read") static void (*PROFILITE_CONST ProfiliteInitDstor)(void) = Profilite_Report;
 #endif
 #endif
 
-PROFILITE_STORAGE void Profilite_Init(void)
+PROFILITE_STORAGE void
+#if PROFILITE_TRADITIONAL
+Profilite_Init()
+#else
+Profilite_Init(void)
+#endif
 {
 }
 
-PROFILITE_STORAGE struct profilite_scope Profilite_BeginScope(struct profilite_profile *Profile)
+PROFILITE_STORAGE struct profilite_scope
+#if PROFILITE_TRADITIONAL
+Profilite_BeginScope(Profile)
+struct profilite_profile *Profile;
+#else
+Profilite_BeginScope(struct profilite_profile *Profile)
+#endif
 {
     struct profilite_scope Scope;
+    Scope.Parent = Profile;
     return Scope;
 }
 
-PROFILITE_STORAGE void Profilite_EndScope(struct profilite_scope *Scope)
+PROFILITE_STORAGE void
+#if PROFILITE_TRADITIONAL
+    Profilite_EndScope(Scope) struct profilite_scope *Scope;
+#else
+Profilite_EndScope(struct profilite_scope *Scope)
+#endif
 {
+    (void)Scope;
 }
 
-PROFILITE_STORAGE void Profilite_Report(void)
+PROFILITE_STORAGE void
+#if PROFILITE_TRADITIONAL
+Profilite_Report()
+#else
+Profilite_Report(void)
+#endif
 {
 }
 
