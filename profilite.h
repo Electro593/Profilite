@@ -30,8 +30,9 @@
  * \details Overrides \ref PROFILITE_HEADER and \ref PROFILITE_IMPLEMENTATION.
  * If unset, all profiler macros and functions will be compiled out.
  *
- * This is a **header** configuration. It is recommended to define this in your
- * build system so that it can be enabled or disabled in only one location.
+ * This is both a **header** and **implementation** configuration. It is
+ * recommended to define this in your build system so that it can be enabled
+ * or disabled in only one location.
  *
  * Defaults to 0.
  */
@@ -41,33 +42,6 @@
 #if (0 - PROFILITE - 1) == 1 && (PROFILITE - 0) != -2 /* Check empty */
 #undef PROFILITE
 #define PROFILITE 1
-#endif
-#endif
-
-/**
- * \def PROFILITE_AUTO_REPORT
- *
- * \brief Enable automatic Profilite_Init() and Profilite_Report() on process
- * start and exit.
- *
- * \details If set, Profilite_Init() will be inserted into the `.init_array`/
- * `.CRT$XCU` sections to automatically execute on process start. Similarly,
- * Profilite_Report() will be inserted into `.fini_array`/`.CRT$XPU` to execute
- * on process termination.
- *
- * This is an **implementation** configuration.
- *
- * Defaults to 0.
- *
- * \warning If you use a custom entrypoint, the functions will still be placed
- * into the above sections but will not be executed automatically.
- */
-#ifndef PROFILITE_AUTO_REPORT
-#define PROFILITE_AUTO_REPORT 0
-#else
-#if (0 - PROFILITE_AUTO_REPORT - 1) == 1 && (PROFILITE_AUTO_REPORT - 0) != -2 /* Check empty */
-#undef PROFILITE_AUTO_REPORT
-#define PROFILITE_AUTO_REPORT 1
 #endif
 #endif
 
@@ -167,10 +141,15 @@
 #define PROFILITE_HEADER 0
 #endif
 
+/* Define __extension__ if running GCC v1.x */
+#if !defined(__extension__) && defined(__GNUC__) && __GNUC__ < 2
+#define __extension__
+#endif
+
 /**
  * \defgroup compiler_polyfills Compiler Polyfill Macros
  *
- * \brief Macros for compiler-specific operations.
+ * \brief Macros for compiler- or version- specific operations.
  *
  * \details These are defined for MSVC, Clang, and GCC. Support for other
  * compilers must be configured by defining these polyfills prior to including
@@ -178,6 +157,72 @@
  *
  * \{
  */
+
+/**
+ * \def PROFILITE_CONCAT(A, B)
+ *
+ * \brief Alias for `A ## B`
+ *
+ * \details May be redefined to use your own macro concatenation. Exists
+ * primarily to polyfill on K&R C.
+ */
+#ifndef PROFILITE_CONCAT
+#if PROFILITE_TRADITIONAL
+/* clang-format off */
+#define PROFILITE_CONCAT(A, B) A/**/B
+/* clang-format on */
+#else
+#define PROFILITE_CONCAT(A, B) A##B
+#endif
+#endif
+
+/**
+ * \def PROFILITE_CONST
+ *
+ * \brief Alias for `const`.
+ *
+ * \details May be redefined to disable const. Polyfilled on K&R C as empty.
+ */
+#ifndef PROFILITE_CONST
+#if PROFILITE_TRADITIONAL
+#define PROFILITE_CONST
+#else
+#define PROFILITE_CONST const
+#endif
+#endif
+
+/**
+ * \def PROFILITE_TIME_T
+ *
+ * \brief The type to use for storing timestamps.
+ *
+ * \details Defaults to `unsigned long long int`, but may be redefined to
+ * specify a different base type. Polyfilled on K&R C as `long int` and on
+ * unsupported C89 compilers as `unsigned long int`.
+ */
+#ifndef PROFILITE_TIME_T
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ > 199409L
+#define PROFILITE_TIME_T unsigned long long int
+#else
+#if defined(__GNUC__) || defined(__clang__)
+__extension__ typedef unsigned long long int profilite_uint64;
+#define PROFILITE_TIME_T profilite_uint64
+#else
+#if defined(_MSC_VER)
+#define PROFILITE_TIME_T unsigned __int64
+#else
+#if PROFILITE_TRADITIONAL
+#define PROFILITE_TIME_T long int
+#else
+/* clang-format off */
+    #warning PROFILITE_TIME_T: Your compiler is unsupported; defaulting to `unsigned long int`, which may be 32-bit. Define PROFILITE_TIME_T prior to inclusion to remove this warning
+/* clang-format on */
+#define PROFILITE_TIME_T unsigned long int
+#endif
+#endif
+#endif
+#endif
+#endif
 
 /**
  * \def PROFILITE_CLEANUP(Function)
@@ -205,21 +250,6 @@
 #endif
 
 /**
- * \def PROFILITE_CONST
- *
- * \brief Alias for `const`.
- *
- * \details May be redefined to disable const. Polyfilled on K&R C as empty.
- */
-#ifndef PROFILITE_CONST
-#if PROFILITE_TRADITIONAL
-#define PROFILITE_CONST
-#else
-#define PROFILITE_CONST const
-#endif
-#endif
-
-/**
  * \def PROFILITE_SECTION(Name, ...)
  *
  * \brief Insert the following declaration into the given section.
@@ -238,7 +268,7 @@
 #define PROFILITE_SECTION(Name, Attributes) __attribute__((section(Name)))
 #else
 #if defined(_MSC_VER)
-#define _PROFILITE_SECTION(Name, Attributes) _Pragma("section(" Name ", " Attributes ")") __declspec(allocate(Name))
+#define PROFILITE_SECTION(Name, Attributes) _Pragma("section(" Name ", " Attributes ")") __declspec(allocate(Name))
 #else
 /* clang-format off */
     #error PROFILITE_SECTION: Your compiler is unsupported. Define PROFILITE_SECTION prior to inclusion to remove this error
@@ -247,69 +277,37 @@
 #endif
 #endif
 
-/**
- * \def PROFILITE_UINTMAX
- *
- * \brief Alias for `unsigned long long int`.
- *
- * \details May be redefined to specify a different base type. Polyfilled on
- * K&R C as `long int` and on unsupported C89 compilers as `unsigned long int`.
- */
-#ifndef PROFILITE_UINTMAX
-#if defined(__STDC_VERSION__) && __STDC_VERSION__ > 199409L
-#define PROFILITE_UINTMAX unsigned long long int
-#else
-#if defined(__GNUC__) || defined(__clang__)
-__extension__ typedef unsigned long long int profilite_uint64;
-#define PROFILITE_UINTMAX profilite_uint64
-#else
-#if defined(_MSC_VER)
-#define PROFILITE_UINTMAX unsigned __int64
-#else
-#if PROFILITE_TRADITIONAL
-#define PROFILITE_UINTMAX long int
-#else
-/* clang-format off */
-    #warning PROFILITE_UINTMAX: Your compiler is unsupported; defaulting to `unsigned long int`, which may be 32-bit. Define PROFILITE_UINTMAX prior to inclusion to remove this warning
-/* clang-format on */
-#define PROFILITE_UINTMAX unsigned long int
-#endif
-#endif
-#endif
-#endif
-#endif
-
 /** \} */
 
 struct profilite_profile
 {
+    PROFILITE_CONST char *ProfiliteProfileName;
     PROFILITE_CONST char *ProfiliteProfileFileName;
     PROFILITE_CONST char *ProfiliteProfileFunctionName;
-    PROFILITE_CONST unsigned int ProfiliteProfileLine;
-    PROFILITE_CONST unsigned int ProfiliteProfileId;
+    PROFILITE_CONST long ProfiliteProfileLine;
+    PROFILITE_CONST long ProfiliteProfileId;
 
-    PROFILITE_CONST char *ProfiliteProfileName;
-    PROFILITE_UINTMAX ProfiliteProfileDataSize;
+    PROFILITE_TIME_T ProfiliteProfileElapsed;
+    PROFILITE_TIME_T ProfiliteProfileRootElapsed;
 
-    PROFILITE_UINTMAX ProfiliteProfileElapsed;
-    PROFILITE_UINTMAX ProfiliteProfileRootElapsed;
-    PROFILITE_UINTMAX ProfiliteProfileHitCount;
+    long ProfiliteProfileDataSize;
+    long ProfiliteProfileHitCount;
 };
 
 struct profilite_scope
 {
     struct profilite_profile *ProfiliteScopeProfile;
     struct profilite_profile *ProfiliteScopeParent;
-    PROFILITE_UINTMAX ProfiliteScopeStart;
-    PROFILITE_UINTMAX ProfiliteScopePrevElapsed;
+
+    PROFILITE_TIME_T ProfiliteScopeStart;
+    PROFILITE_TIME_T ProfiliteScopePrevElapsed;
 };
 
 struct profilite
 {
     struct profilite_profile *ProfiliteProfiles;
-    PROFILITE_UINTMAX ProfiliteStart;
-    int ProfiliteInitialized;
-    int ProfilitePadding0;
+
+    PROFILITE_TIME_T ProfiliteStart;
 };
 
 /**
@@ -327,7 +325,7 @@ struct profilite
  * \brief Initialize the profiler.
  *
  * \details All code executed after this call returns, until Profilite_Report(),
- * will be included under the `<Root>` scope in the report.
+ * will be included under the `<Root>` profile in the report.
  *
  * If called again, all previous profile data will be discarded and collection
  * will be restarted from that point onward.
@@ -358,8 +356,8 @@ Profilite_Init(void);
  */
 #ifdef PROFILITE_SECTION
 #define Profilite_DeclareProfile(Id, Name, DataSize)                                                                   \
-    PROFILITE_SECTION(".profiler", "read, write")                                                                      \
-    static struct profiler_profile ProfiliteProfile##Id = {                                                            \
+    struct profiler_scope ProfiliteScope##PROFILITE_SECTION(                                                           \
+        ".profiler", "read, write") static struct profiler_profile ProfiliteProfile##Id = {                            \
         __FILE__, __FUNCTION__, __LINE__, Id, Name, DataSize, 0, 0, 0,                                                 \
     };
 #endif
@@ -459,7 +457,7 @@ Profilite_Report(void);
  *
  * \param DataSize The data size to amend the scope to, in bytes.
  */
-int Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
+int Profile_AmendDataSize(PROFILITE_TIME_T DataSize);
 
 #endif /** PROFILITE_HEADER */
 
@@ -467,6 +465,35 @@ int Profile_AmendDataSize(PROFILITE_UINTMAX DataSize);
 #ifndef PROFILITE_DOXYGEN
 #undef PROFILITE_IMPLEMENTATION
 #define PROFILITE_IMPLEMENTATION 0
+#endif
+
+/**
+ * \def PROFILITE_AUTO_REPORT
+ *
+ * \ingroup configuration
+ *
+ * \brief Enable automatic Profilite_Init() and Profilite_Report() on process
+ * start and exit.
+ *
+ * \details If set, Profilite_Init() will be inserted into the `.init_array`/
+ * `.CRT$XCU` sections to automatically execute on process start. Similarly,
+ * Profilite_Report() will be inserted into `.fini_array`/`.CRT$XPU` to execute
+ * on process termination.
+ *
+ * This is an **implementation** configuration.
+ *
+ * Defaults to 0.
+ *
+ * \warning If you use a custom entrypoint, the functions will still be placed
+ * into the above sections but will not be executed automatically.
+ */
+#ifndef PROFILITE_AUTO_REPORT
+#define PROFILITE_AUTO_REPORT 0
+#else
+#if (0 - PROFILITE_AUTO_REPORT - 1) == 1 && (PROFILITE_AUTO_REPORT - 0) != -2 /* Check empty */
+#undef PROFILITE_AUTO_REPORT
+#define PROFILITE_AUTO_REPORT 1
+#endif
 #endif
 
 #if (PROFILITE_AUTO_REPORT || defined(PROFILITE_DOXYGEN)) && defined(PROFILITE_SECTION)
