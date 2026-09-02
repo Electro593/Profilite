@@ -1,6 +1,5 @@
 #define PROFILITE
 #define PROFILITE_IMPLEMENTATION
-#define PROFILITE_AUTO_REPORT
 #include "profilite.h"
 
 static volatile int a = 0;
